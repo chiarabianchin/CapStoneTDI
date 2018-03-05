@@ -151,5 +151,11 @@ def auto_search(list_of_searches):
         errors = download_images(links, search_keyword, def_choice=True)
         print ("Download Complete.\n"+ str(errors) +" errors while downloading.")
 
-search()
-#auto_search(['zucchini', 'potatoes'])
+#search()
+#auto_search(['zucchini', 'courgettes', 'zucchini images'])
+#auto_search(['zucchini trombetta', 'green zucchini', 'yellow zucchini'])
+#auto_search(['real eggs', 'eggs in fridge', 'egg tray'])
+#auto_search(['potato', 'raw potato', 'potato bag'])
+auto_search(['yellow potatoes'])
+#auto_search(['tomato', 'red tomato', 'tomato in fridge'])
+#auto_search(['lettuce', 'insalata', 'butterhead','crisphead', 'radicchio','white lettuce', 'rucola'])

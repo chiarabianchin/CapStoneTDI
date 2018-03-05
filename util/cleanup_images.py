@@ -6,10 +6,13 @@ import sys
 from keras.preprocessing import image
 
 def cleanup(path, run=False):
-    print("Reading from", path)
+    print "Running"
 
     for root, dirs, ff in os.walk(path):
+        print "Summary", dirs
         for d in dirs:
+            if d == 'original_images':
+                continue
             folder_path = join(path, d)
             print "Examining", folder_path
             count = 0
@@ -23,7 +26,7 @@ def cleanup(path, run=False):
                             image.load_img(fp, target_size=(250, 250))
 
                         except:
-                            count+=1
+                            count += 1
 
                             print "Remove", fp
                             if run:
@@ -37,4 +40,7 @@ if __name__ == "__main__":
         opt = sys.argv[2]
     except:
         pass
-    cleanup(sys.argv[1], run=opt)
+    path = sys.argv[1]
+    print("Reading from", path)
+    print("Delete mode", opt)
+    cleanup(path, run=opt)
