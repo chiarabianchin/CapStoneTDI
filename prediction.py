@@ -1,5 +1,7 @@
 # prediction on a new sample
 import numpy as np
+#time
+import time
 #load model
 from keras.models import load_model
 # keras with ImageDataGeneration
@@ -8,6 +10,8 @@ from keras.utils import plot_model
 
 np.random.seed(123)
 def prediction():
+
+    start_time = time.time()
 
     labels = {0: 'butter', 2: 'lettuce', 1: 'eggs', 3: 'tomatoes_images',
               4: 'zucchini'}
@@ -42,7 +46,7 @@ def prediction():
             y += 1
     print "Correct answers", y, "; Wrong answers: ", n
     print "Expected Accuracy",
-
+    print "Execution time", time.time()-start_time, "seconds"
 
 if __name__ == "__main__":
     prediction()

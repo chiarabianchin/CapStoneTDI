@@ -1,4 +1,6 @@
 import numpy as np
+#time
+import time
 #model module
 from keras.models import Sequential
 #core layers
@@ -8,7 +10,7 @@ from keras.layers import Convolution2D, MaxPooling2D
 #utilities
 from keras.utils import np_utils
 from keras.utils import plot_model
-from keras.callbacks import History, TensorBoard
+from keras.callbacks import History, TensorBoard, EarlyStopping
 # keras with ImageDataGeneration
 from keras.preprocessing import image
 #save
@@ -16,6 +18,7 @@ from keras.models import load_model
 #plotting
 from matplotlib import pyplot as plt
 
+start_time = time.time()
 np.random.seed(123)
 
 history = History()
@@ -24,7 +27,7 @@ history = History()
 board = TensorBoard(log_dir='./logs', histogram_freq=0, batch_size=32, write_graph=True,\
             write_grads=False, write_images=False, embeddings_freq=0, \
             embeddings_layer_names=None, embeddings_metadata=None)
-
+stop_when_ok = EarlyStopping(monitor='val_loss', min_delta=0.05, patience=2, verbose=0, mode='auto')
 # read images for training sample
 # data augmentation applied
 train_datagen = image.ImageDataGenerator(
@@ -52,12 +55,13 @@ validation_generator = test_datagen.flow_from_directory(
 #define model
 model = Sequential()
 model.add(Convolution2D(32, 3, 3, activation='relu', input_shape=(150,150,3)))
+# this additional convolution doesn't seem to help
 #model.add(Convolution2D(32, 3, 3, activation='relu', input_shape=(28,28,3)))
 model.add(Convolution2D(32, 3, 3, activation='relu'))
 model.add(MaxPooling2D(pool_size=(2,2)))
 # if the result on the test set is much worse than the training set we should
 # increase te dropout coefficient to reduce the overfitting
-model.add(Dropout(0.25))
+#model.add(Dropout(0.25))
 
 model.add(Flatten())
 model.add(Dense(128, activation='relu'))
@@ -69,7 +73,7 @@ model.compile(loss='categorical_crossentropy',
 output = None
 # read the model from file or fit it
 try:
-    model = load_model("model_20_steps_epoch_20_epochs_20_val_steps.h5", by_name=True)
+    model = load_model("model_20_steps_epoch_20_epochs_20_val_steps.h5")
 
 except:
     output = model.fit_generator(
@@ -88,7 +92,7 @@ performance = output.history
 print(performance)
 #save the model to file
 model.save("model_testing.h5")
-
+print "Execution time", time.time()-start_time, "seconds"
 # plot performance
 plt.figure(1)
 plt.subplot(121)
@@ -113,6 +117,7 @@ plt.legend(['train', 'validation'])
 - train with more images
 - test another model adding a convolution for instance
 - implement patience in training,
+- calculate precision TP/(FP + TP) and recall TP/(TP+FN), confusion matrix
 - recongize complex image with more vegetables
 - add images
   '''
