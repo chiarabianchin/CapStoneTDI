@@ -1,6 +1,4 @@
 import numpy as np
-#time
-import time
 #model module
 from keras.models import Sequential
 #core layers
@@ -8,120 +6,145 @@ from keras.layers import Dense, Dropout, Activation, Flatten
 #CNN layers
 from keras.layers import Convolution2D, MaxPooling2D
 #utilities
-from keras.utils import np_utils
-from keras.utils import plot_model
-from keras.callbacks import History, TensorBoard, EarlyStopping
-# keras with ImageDataGeneration
-from keras.preprocessing import image
-#save
-from keras.models import load_model
+from keras.utils import to_categorical
+#data
+from keras.datasets import mnist
 #plotting
 from matplotlib import pyplot as plt
+#save
+from keras.models import load_model
+from keras.models import model_from_json
+# images
+from PIL import Image
+from keras.preprocessing import image
+# file system
+from os import listdir
+from os.path import isfile, join
+import sys
+#shuffling
+from sklearn.utils import shuffle
 
-start_time = time.time()
 np.random.seed(123)
 
-history = History()
+# Load test images
+def populate_X_y(path, label):
+    print("Reading from", path)
+    x = []
+    y = []
+    for f in listdir(path):
+        with open(join(path, f)) as fp:
+            try:
+                img = image.load_img(fp, target_size=(150, 150))
+                #img = image.load_img(fp, target_size=(28, 28))
+                plt.imshow(img)
+                x.append(image.img_to_array(img))
+                y.append(label)
+                #plt.show()
+            except:
+                continue
+    X = np.array(x)
+    Y = np.array(y)
 
-# tensor flow board.Open with > tensorboard --logdir="logs"
-board = TensorBoard(log_dir='./logs', histogram_freq=0, batch_size=32, write_graph=True,\
-            write_grads=False, write_images=False, embeddings_freq=0, \
-            embeddings_layer_names=None, embeddings_metadata=None)
-stop_when_ok = EarlyStopping(monitor='val_loss', min_delta=0.05, patience=2, verbose=0, mode='auto')
-# read images for training sample
-# data augmentation applied
-train_datagen = image.ImageDataGenerator(
-        rescale=1./255,
-        shear_range=0.2,
-        zoom_range=0.2,
-        horizontal_flip=True)
+    print(X.shape, Y.shape)
+    return X, Y
 
-test_datagen = image.ImageDataGenerator(rescale=1./255)
+def convert(y_train_classes, force_classes=None):
+    #covert classes to categories
+    uniques, ids = np.unique(y_train_classes, return_inverse=True)
+    if not force_classes:
+        force_classes = len(uniques)
 
-train_generator = train_datagen.flow_from_directory(
-        '../dataset/train',
-        target_size=(150, 150),
-        batch_size=32,
-        class_mode='categorical')
-print(train_generator.class_indices)
+    Y_train = to_categorical(ids, force_classes)
+    print(y_train_classes.shape, Y_train.shape)
+    return Y_train
 
-# read images for validation sample
-validation_generator = test_datagen.flow_from_directory(
-        '../dataset/validation',
-        target_size=(150, 150),
-        batch_size=32,
-        class_mode='categorical')
+def training(X_train, y_train):
 
-#define model
-model = Sequential()
-model.add(Convolution2D(32, 3, 3, activation='relu', input_shape=(150,150,3)))
-# this additional convolution doesn't seem to help
-#model.add(Convolution2D(32, 3, 3, activation='relu', input_shape=(28,28,3)))
-model.add(Convolution2D(32, 3, 3, activation='relu'))
-model.add(MaxPooling2D(pool_size=(2,2)))
-# if the result on the test set is much worse than the training set we should
-# increase te dropout coefficient to reduce the overfitting
-#model.add(Dropout(0.25))
+    #normalize values in the range [0,1]
+    n_classes = len(set(y_train))
+    print("N CLASSES", n_classes)
+    X_train = X_train.astype('float32')
+    X_train /= 255
+    #X_test = X_test.astype('float32')
+    #X_test /= 255
 
-model.add(Flatten())
-model.add(Dense(128, activation='relu'))
-model.add(Dropout(0.5))
-model.add(Dense(len(train_generator.class_indices), activation='softmax'))
-model.compile(loss='categorical_crossentropy',
-              optimizer='adam',
-              metrics=['accuracy'])
-output = None
-# read the model from file or fit it
-try:
-    model = load_model("model_20_steps_epoch_20_epochs_20_val_steps.h5")
+    print y_train.shape
 
-except:
-    output = model.fit_generator(
-        train_generator,
-        steps_per_epoch=32,
-        epochs=20,
-        validation_data=validation_generator,
-        validation_steps=10,
-        callbacks=[board])
-#save figure of the model structure
-plot_model(model, to_file='model.png', show_shapes=False, show_layer_names=True,
-           rankdir='TB')
+    X_train, y_train = shuffle(X_train, y_train, random_state=0)
+    # Convert 1-dimensional class arrays to 10-dimensional class matrices
+    Y_train = convert(y_train)
+    print("Check:", Y_train[:10])
 
-# output of the performance at each iteration (epoch)
-performance = output.history
-print(performance)
-#save the model to file
-model.save("model_testing.h5")
-print "Execution time", time.time()-start_time, "seconds"
-# plot performance
-plt.figure(1)
-plt.subplot(121)
-plt.plot(range(1, len(performance['acc'])+1), performance['acc'], 'r*')
-plt.plot(range(1, len(performance['val_acc'])+1), performance['val_acc'], 'bo')
-plt.xlabel("Epoch")
-plt.ylabel("Accuracy")
-plt.ylim(0, 1)
-plt.legend(['train', 'validation'])
+    #model architecture
+    model = Sequential()
+    model.add(Convolution2D(32, 3, 3, activation='relu', input_shape=(250,250,3)))
+    #model.add(Convolution2D(32, 3, 3, activation='relu', input_shape=(28,28,3)))
+    model.add(Convolution2D(32, 3, 3, activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2,2)))
+    # if the result on the test set is much worse than the training set we should
+    # increase te dropout coefficient to reduce the overfitting
+    model.add(Dropout(0.25))
 
-plt.subplot(122)
-plt.plot(range(1, len(performance['loss'])+1), performance['loss'], 'r*')
-plt.plot(range(1, len(performance['val_loss'])+1), performance['val_loss'], 'bo')
-plt.xlabel("Epoch")
-plt.ylabel("Loss")
-plt.legend(['train', 'validation'])
+    model.add(Flatten())
+    model.add(Dense(128, activation='relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(n_classes, activation='softmax'))
 
+    print model.output_shape
 
-#TODO:
-'''
-- prediction with current model, done
-- train with more images
-- test another model adding a convolution for instance
-- implement patience in training,
-- calculate precision TP/(FP + TP) and recall TP/(TP+FN), confusion matrix
-- recongize complex image with more vegetables
-- add images
-  '''
+    #compile model
+    #binary_crossentropy for binary classification
+    model.compile(loss='categorical_crossentropy',
+                  optimizer='adam',
+                  metrics=['accuracy'])
 
-plt.show()
+    #try:
+        #model.load_model("model_keras_tut.h5", by_name=True)
+    #except:
+        ##training
+        #model.fit(X_train, Y_train,
+              #batch_size=32, nb_epoch=5, verbose=1)
+        #model.save("model_keras_tut.h5")
+    #training
+    model.fit(X_train, Y_train,
+              batch_size=32, nb_epoch=5, verbose=1)
+    model.save("model_keras_tut.h5")
 
+def pred(X_test, Y_test):
+    # predict
 
+    try:
+        model = load_model("model_keras_tut.h5")
+        model.summary()
+        model.get_config()
+    except IOError:
+        print "Run the training first"
+
+    # test
+    print(convert(Y_test, 2))
+    score = model.evaluate(X_test, convert(Y_test, 2), verbose=0)
+    print("Test score", score)
+    output = model.predict(X_test)
+    #print("shape output", type(output))
+    for i in range(0, output.shape[0]):
+        print(output[i, :], Y_test[i])
+
+        #print np.where(output[i,:] == max(output[i,:])), Y_test[i]
+def main():
+
+    if sys.argv[1] == "train":
+        X_potatoes, Y_potatoes = populate_X_y('../dataset/potatoes/', "potato")
+        X_tomatoes, Y_tomatoes = populate_X_y('../dataset/tomatoes_images/', "tomato")
+        X_lettuce, Y_lettuce = populate_X_y('../dataset/lettuce/', "lettuce")
+        X_train = np.concatenate((X_potatoes, X_tomatoes, X_lettuce))
+        Y_train = np.concatenate((Y_potatoes, Y_tomatoes, Y_lettuce))
+        print(Y_train)
+        print("Training...")
+        training(X_train, Y_train)
+        print("Done")
+    else:
+        X_test, Y_test = populate_X_y("../dataset/vegetable_images", '')
+        pred(X_test, Y_test)
+
+if __name__ == "__main__":
+    main()

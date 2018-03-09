@@ -20,11 +20,14 @@ def cleanup(path, run=False):
                 if len(f) == 0:
                     break
                 print "N Files, no dir", len(f)
+                if len([i for i in f if any(i.endswith(ext)
+                        for ext in ['jpg', 'png'])]) < 5:
+                    print "Less than 5 images, no remove applied"
+                    continue
                 for i in f:
                     with open(join(folder_path, i)) as fp:
                         try:
                             image.load_img(fp, target_size=(250, 250))
-
                         except:
                             count += 1
 
