@@ -5,6 +5,7 @@ from os.path import isfile, join
 import sys
 from keras.preprocessing import image
 
+
 def cleanup(path, run=False):
     print "Running"
 

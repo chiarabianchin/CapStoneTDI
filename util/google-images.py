@@ -160,4 +160,4 @@ def auto_search(list_of_searches):
 #auto_search(['tomato', 'red tomato', 'tomato in fridge'])
 #auto_search(['lettuce', 'insalata', 'butterhead','crisphead', 'radicchio','white lettuce', 'rucola'])
 #auto_search(['ships', 'cats', 'cars'])
-auto_search(['landscapes'])
+auto_search(['pantera', 'people', 'furnitures'])
