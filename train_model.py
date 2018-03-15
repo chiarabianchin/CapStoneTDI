@@ -27,22 +27,30 @@ from sklearn.utils import shuffle
 np.random.seed(123)
 
 # Load test images
-def populate_X_y(path, label):
+def populate_X_y(path, label=0, r_w=150, r_h=150):
     print("Reading from", path)
     x = []
     y = []
     for f in listdir(path):
         with open(join(path, f)) as fp:
             try:
-                img = image.load_img(fp, target_size=(150, 150))
+                img1 = np.array(image.load_img(fp, target_size=(r_w, r_h)))
+
+                img2 = np.array(Image.open(fp).resize((150, 150)))
+
                 #img = image.load_img(fp, target_size=(28, 28))
-                plt.imshow(img)
-                x.append(image.img_to_array(img))
-                y.append(label)
+                #plt.imshow(img)
+                x.append(img1)
+                print type(x), type(img2)
+                print len(x), img2.shape
+                if label:
+                    y.append(label)
                 #plt.show()
             except:
                 continue
     X = np.array(x)
+    X = X.astype('float32')
+    X /= 255.  # this is VERY IMPORTANT!
     Y = np.array(y)
 
     print(X.shape, Y.shape)

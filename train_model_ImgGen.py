@@ -1,5 +1,6 @@
 import numpy as np
 import sys
+import json
 #time
 import time
 #model module
@@ -30,23 +31,23 @@ def train_model(train_path, val_path, model_f_name, isbinary=False):
     start_time = time.time()
     np.random.seed(123456789)
 
-    history = History()
-
     # tensor flow board.Open with > tensorboard --logdir="logs"
-    board = TensorBoard(log_dir='./logs/{}'.format(time.time()), histogram_freq=0, batch_size=32, write_graph=True,\
-                write_grads=False, write_images=False, embeddings_freq=0, \
+    board = TensorBoard(log_dir='./logs/{}'.format(time.time()),
+                histogram_freq=0, batch_size=32, write_graph=True,
+                write_grads=False, write_images=False, embeddings_freq=0,
                 embeddings_layer_names=None, embeddings_metadata=None)
-    stop_when_ok = EarlyStopping(monitor='val_loss', min_delta=0.05, patience=3, verbose=1, mode='auto')
+    stop_when_ok = EarlyStopping(monitor='val_loss', min_delta=0.05, patience=3,
+                                 verbose=1, mode='auto')
     callbacks_list = [stop_when_ok, board]
     # read images for training sample
     # data augmentation applied
-    im_w = 128 #150
-    im_h = 128 #150
+    im_w = 128  # 150
+    im_h = 128  # 150
     im_c = 3
     train_datagen = image.ImageDataGenerator(
         featurewise_center=True,
         featurewise_std_normalization=True,
-        rescale=1./255,
+        rescale=1. / 255,
         shear_range=0.2,
         zoom_range=0.2,
         horizontal_flip=True)
@@ -54,14 +55,15 @@ def train_model(train_path, val_path, model_f_name, isbinary=False):
     test_datagen = image.ImageDataGenerator(
         featurewise_center=True,
         featurewise_std_normalization=True,
-        rescale=1./255)
+        rescale=1. / 255)
 
     train_generator = train_datagen.flow_from_directory(
             train_path,
             target_size=(im_w, im_h),
             batch_size=32,
             class_mode='categorical')
-    print(train_generator.class_indices)
+
+    json.dump(train_generator.class_indices, open(model_f_name + '.json', 'w'))
 
     # read images for validation sample
     validation_generator = test_datagen.flow_from_directory(
@@ -72,13 +74,14 @@ def train_model(train_path, val_path, model_f_name, isbinary=False):
 
     #define model
     model = Sequential()
-    model.add(Convolution2D(32, 7, 7, activation='relu', input_shape=(im_w,im_h,im_c)))
-    model.add(MaxPooling2D(pool_size=(2,2)))
+    model.add(Convolution2D(32, 7, 7, activation='relu',
+                            input_shape=(im_w, im_h, im_c)))
+    model.add(MaxPooling2D(pool_size=(2, 2)))
     # this additional convolution doesn't seem to help
-    model.add(Convolution2D(64, 5, 5, activation='relu')) #, input_shape=(28,28,3)
-    model.add(MaxPooling2D(pool_size=(2,2)))
+    model.add(Convolution2D(64, 5, 5, activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2)))
     model.add(Convolution2D(128, 3, 3, activation='relu'))
-    model.add(MaxPooling2D(pool_size=(2,2)))
+    model.add(MaxPooling2D(pool_size=(2, 2)))
     # if the result on the test set is much worse than the training set we should
     # increase te dropout coefficient to reduce the overfitting
     #model.add(Dropout(0.20))
@@ -94,6 +97,8 @@ def train_model(train_path, val_path, model_f_name, isbinary=False):
                   optimizer=adam,
                   metrics=['accuracy'])
     output = None
+    #print model.to_json()
+
     # read the model from file or fit it
     try:
         model = load_model("dummy")
@@ -107,28 +112,32 @@ def train_model(train_path, val_path, model_f_name, isbinary=False):
             validation_steps=10,
             callbacks=callbacks_list)
     #save figure of the model structure
-    plot_model(model, to_file=model_f_name+'.png', show_shapes=False, show_layer_names=True,
-               rankdir='TB')
-
+    plot_model(model, to_file=model_f_name+'.png', show_shapes=False,
+               show_layer_names=True, rankdir='TB')
+    print "________________________________________"
+    print model.predict_generator(validation_generator)
     # output of the performance at each iteration (epoch)
     performance = output.history
     print(performance)
     #save the model to file
-    model.save(model_f_name+".h5")
-    print "Execution time", time.time()-start_time, "seconds"
+    model.save(model_f_name + ".h5")
+
+    print "Execution time", time.time() - start_time, "seconds"
     # plot performance
     plt.figure(1)
     plt.subplot(121)
-    plt.plot(range(1, len(performance['acc'])+1), performance['acc'], 'r*')
-    plt.plot(range(1, len(performance['val_acc'])+1), performance['val_acc'], 'bo')
+    plt.plot(range(1, len(performance['acc']) + 1), performance['acc'], 'r*')
+    plt.plot(range(1, len(performance['val_acc']) + 1), performance['val_acc'],
+             'bo')
     plt.xlabel("Epoch")
     plt.ylabel("Accuracy")
     plt.ylim(0, 1)
     plt.legend(['train', 'validation'])
 
     plt.subplot(122)
-    plt.plot(range(1, len(performance['loss'])+1), performance['loss'], 'r*')
-    plt.plot(range(1, len(performance['val_loss'])+1), performance['val_loss'], 'bo')
+    plt.plot(range(1, len(performance['loss']) + 1), performance['loss'], 'r*')
+    plt.plot(range(1, len(performance['val_loss']) + 1), performance['val_loss'],
+              'bo')
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.legend(['train', 'validation'])
@@ -146,6 +155,7 @@ def train_model(train_path, val_path, model_f_name, isbinary=False):
       '''
 
     plt.show()
+
 
 def main():
     train_path = sys.argv[1]

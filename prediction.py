@@ -3,6 +3,7 @@
 import sys
 import numpy as np
 import itertools
+import json
 #time
 import time
 #load model
@@ -37,6 +38,41 @@ def convert(y_train_classes, force_classes=None):
     print(y_train_classes.shape, Y_train.shape)
     return Y_train, ids
 
+def import_labels(model_path):
+    dic = json.loads(open(model_path.replace(".h5", ".json"), 'r').read())
+
+    inv_dic = {v: k for k, v in dic.items()}
+    return inv_dic
+
+
+def blindpred(X_test, model_path):
+    id_label = import_labels(model_path)
+    print id_label
+    try:
+        model = load_model(model_path)
+        model.summary()
+        model.get_config()
+    except IOError:
+        print "Check model name (", model_path, ") or run the training first"
+        return
+
+    output = model.predict(X_test)
+    output_class = model.predict_classes(X_test)
+    print "Raw output"
+    print output_class
+    print output
+    Y_pred = output.argmax(axis=-1)
+    fg = plt.figure("histo")
+    plt.hist(Y_pred, bins=len(id_label.values()))
+    tick_marks = np.arange(len(id_label.values()))
+    plt.xticks(tick_marks, id_label.values(), rotation=30)
+    plt.xlabel("Predicted Classes")
+    plt.ylabel("N of events")
+
+    plt.show()
+    return
+
+
 def pred(X_test, Y_test, model_path, n_cl):
     # predict
 
@@ -45,7 +81,8 @@ def pred(X_test, Y_test, model_path, n_cl):
         model.summary()
         model.get_config()
     except IOError:
-        print "Run the training first"
+        print "Check model name (", model_path, ") or run the training first"
+        return
 
     # test
     #print(convert(Y_test, 2))
@@ -54,8 +91,9 @@ def pred(X_test, Y_test, model_path, n_cl):
     score = model.evaluate(X_test, Y_test_cat, verbose=0)
     #score = model.evaluate(X_test, Y_test, verbose=0)
     print("Test score", score)
-    print "HEEEERE", X_test.shape
+    #prediction
     output = model.predict(X_test)
+
     #print("shape output", type(output))
     for i in range(0, output.shape[0]):
         print output[i, :], Y_test[i]
@@ -68,13 +106,18 @@ def pred(X_test, Y_test, model_path, n_cl):
     cm = confusion_matrix(Y_test_cl, Y_pred)
     print "Accuracy", accuracy_score(Y_test_cl, Y_pred)
     print "Confusion matrix", cm
-    print "Precision", precision_score(Y_test_cl, Y_pred)
-    print "Recall", recall_score(Y_test_cl, Y_pred)
-    print "F1", f1_score(Y_test_cl, Y_pred)
+    labels = set(Y_pred)
+    print "Precision", precision_score(Y_test_cl, Y_pred, labels=labels, average='macro')
+    print "Recall", recall_score(Y_test_cl, Y_pred, labels=labels, average='macro')
+    print "F1", f1_score(Y_test_cl, Y_pred, labels=labels, average='macro')
 
-    plt.figure()
+    plt.figure("Confusion matrix")
     plot_confusion_matrix(cm, set(Y_test))
-    plt.show()#save("confusion_matrix.pdf")
+    plt.savefig("confusion_matrix" + model_path + ".pdf")
+    plt.figure("Normalized confusion matrix")
+    plot_confusion_matrix(cm, set(Y_test), normalize=True)
+    plt.savefig("norm_confusion_matrix" + model_path + ".pdf")
+    plt.show()
 
 def plot_confusion_matrix(cm, classes,
                           normalize=False,
@@ -171,6 +214,7 @@ def run_model_on_proposed_regions(path_img, model, r_w=150, r_h=150, n=100,
         #cv2.imshow("f"+str(n), v)
     X = np.array(x)
     output = model.predict(X)
+
     Y_pred = output.argmax(axis=-1)
 
     # prob_labels = (label, prob)
@@ -178,25 +222,47 @@ def run_model_on_proposed_regions(path_img, model, r_w=150, r_h=150, n=100,
 
     return prob_labels
 
-def main(model_path, test_paths, labels, n_cl):
+
+def main(model_path, test_paths, labels, n_cl, rw=150, rh=150):
+    ''' Usage:
+        python ../modelling/prediction.py model_xxx.h5 ['../../dataset/test/cl1',
+            '../../dataset/test/cl2'] ['cl1','cl2'] 2 150 150
+
+    '''
     X_test = []
     Y_test = []
 
-    for i, p in enumerate(test_paths):
-        X, Y = populate_X_y(p, labels[i])
-        if len(X_test) > 0:
-            X_test = np.concatenate((X_test, X))
-            Y_test = np.concatenate((Y_test, Y))
-        else:
-            X_test = X
-            Y_test = Y
-    print X_test.shape, Y_test.shape
+    if len(labels) != len(test_paths):
+        #prediction on unlabelled sample
+        print '******* Blind test********'
+        for p in test_paths:
+            X, _ = populate_X_y(p, r_w=rw, r_h=rh)
+            if len(X_test) > 0:
+                X_test = np.concatenate((X_test, X))
+            else:
+                X_test = X
+        blindpred(X_test, model_path)
+    else:
+        #test on labelled sample
+        for i, p in enumerate(test_paths):
+            X, Y = populate_X_y(p, labels[i], rw, rh)
+            if len(X_test) > 0:
+                X_test = np.concatenate((X_test, X))
+                Y_test = np.concatenate((Y_test, Y))
+            else:
+                X_test = X
+                Y_test = Y
+        print X_test.shape, Y_test.shape
 
-    pred(X_test, Y_test, model_path, n_cl)
+        pred(X_test, Y_test, model_path, n_cl)
+
 
 if __name__ == "__main__":
     model_path = sys.argv[1]
     test_paths = map(str, sys.argv[2].strip('[]').split(','))
     labels =  map(str, sys.argv[3].strip('[]').split(','))
     n_cl = int(sys.argv[4])
-    main(model_path, test_paths, labels, n_cl)
+    rw, rh = 150, 150
+    if len(sys.argv)>5:
+        rw, rh = int(sys.argv[5]), int(sys.argv[6])
+    main(model_path, test_paths, labels, n_cl, rw, rh)
