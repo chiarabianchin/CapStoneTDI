@@ -35,17 +35,10 @@ def populate_X_y(path, label=0, r_w=150, r_h=150):
         with open(join(path, f)) as fp:
             try:
                 img1 = np.array(image.load_img(fp, target_size=(r_w, r_h)))
-
-                img2 = np.array(Image.open(fp).resize((150, 150)))
-
-                #img = image.load_img(fp, target_size=(28, 28))
-                #plt.imshow(img)
+                #img2 = np.array(Image.open(fp).resize((150, 150)))
                 x.append(img1)
-                print type(x), type(img2)
-                print len(x), img2.shape
                 if label:
                     y.append(label)
-                #plt.show()
             except:
                 continue
     X = np.array(x)
@@ -56,6 +49,7 @@ def populate_X_y(path, label=0, r_w=150, r_h=150):
     print(X.shape, Y.shape)
     return X, Y
 
+
 def convert(y_train_classes, force_classes=None):
     #covert classes to categories
     uniques, ids = np.unique(y_train_classes, return_inverse=True)
@@ -65,6 +59,7 @@ def convert(y_train_classes, force_classes=None):
     Y_train = to_categorical(ids, force_classes)
     print(y_train_classes.shape, Y_train.shape)
     return Y_train
+
 
 def training(X_train, y_train):
 

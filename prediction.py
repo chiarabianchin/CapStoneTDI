@@ -27,8 +27,10 @@ import cv2
 #my methods
 from train_model import populate_X_y
 
+
 def convert(y_train_classes, force_classes=None):
-    #covert classes to categories
+    '''covert classes to categories (one-hot encoding)
+    '''
     #TODO fix the determination of number of classes: from dictionary of labels, to be saved
     uniques, ids = np.unique(y_train_classes, return_inverse=True)
     if not force_classes:
@@ -38,14 +40,36 @@ def convert(y_train_classes, force_classes=None):
     print(y_train_classes.shape, Y_train.shape)
     return Y_train, ids
 
+
 def import_labels(model_path):
+    '''Transform a dictionary of the form key = "label", value = int to
+    key = int, value = "label"
+    '''
     dic = json.loads(open(model_path.replace(".h5", ".json"), 'r').read())
 
     inv_dic = {v: k for k, v in dic.items()}
     return inv_dic
 
 
+def cutoffprediction(output, cutoff=0.8):
+    '''output = result of prediction
+    cutoff = check if any of the probabilities is larger than cutoff.
+    if not the predicted class is -1
+    '''
+    predcutoff = []
+    for ex in output:
+        if any([clp for clp in ex if clp > cutoff]):
+            predcutoff.append(-1)
+        else:
+            predcutoff.append(ex.argmax(axis=-1))
+    return predcutoff
+
+
 def blindpred(X_test, model_path):
+    '''Prediction without inputing labels
+    X_test = matrix of images
+    model_path = model file name (w/ extension .h5)
+    '''
     id_label = import_labels(model_path)
     print id_label
     try:
@@ -57,17 +81,28 @@ def blindpred(X_test, model_path):
         return
 
     output = model.predict(X_test)
+    Y_pred_cutoff = cutoffprediction(output)
     output_class = model.predict_classes(X_test)
     print "Raw output"
     print output_class
-    print output
+    print "N with probability less than cutoff", \
+    len([i for i in Y_pred_cutoff if i == -1]), "/", len(Y_pred_cutoff)
+    #print output
     Y_pred = output.argmax(axis=-1)
-    fg = plt.figure("histo")
+    fg = plt.figure("histo prediction")
     plt.hist(Y_pred, bins=len(id_label.values()))
     tick_marks = np.arange(len(id_label.values()))
     plt.xticks(tick_marks, id_label.values(), rotation=30)
     plt.xlabel("Predicted Classes")
     plt.ylabel("N of events")
+
+    fg = plt.figure("histo prediction with minimum probability")
+    plt.hist(Y_pred_cutoff, bins=len(id_label.values()) + 1)
+    tick_marks = np.arange(len(id_label.values()) + 1)
+    plt.xticks(tick_marks, ['none'] + id_label.values(), rotation=30)
+    plt.xlabel("Predicted Classes")
+    plt.ylabel("N of events")
+
 
     plt.show()
     return
@@ -113,10 +148,10 @@ def pred(X_test, Y_test, model_path, n_cl):
 
     plt.figure("Confusion matrix")
     plot_confusion_matrix(cm, set(Y_test))
-    plt.savefig("confusion_matrix" + model_path + ".pdf")
+    plt.savefig("confusion_matrix" + model_path.replace('.h5', ".pdf"))
     plt.figure("Normalized confusion matrix")
     plot_confusion_matrix(cm, set(Y_test), normalize=True)
-    plt.savefig("norm_confusion_matrix" + model_path + ".pdf")
+    plt.savefig("norm_confusion_matrix" + model_path.replace('.h5', ".pdf"))
     plt.show()
 
 def plot_confusion_matrix(cm, classes,
