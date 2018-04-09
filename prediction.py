@@ -102,8 +102,6 @@ def blindpred(X_test, model_path):
     plt.xticks(tick_marks, ['none'] + id_label.values(), rotation=30)
     plt.xlabel("Predicted Classes")
     plt.ylabel("N of events")
-
-
     plt.show()
     return
 
@@ -140,17 +138,21 @@ def pred(X_test, Y_test, model_path, n_cl):
 
     cm = confusion_matrix(Y_test_cl, Y_pred)
     print "Accuracy", accuracy_score(Y_test_cl, Y_pred)
-    print "Confusion matrix", cm
-    labels = set(Y_pred)
-    print "Precision", precision_score(Y_test_cl, Y_pred, labels=labels, average='macro')
-    print "Recall", recall_score(Y_test_cl, Y_pred, labels=labels, average='macro')
+    #print "Confusion matrix", cm
+    # labels = set(Y_pred)
+    labels = import_labels(model_path)
+    labels_str = [labels[i] for i in range(0, len(labels))]
+
+    print "Precision", precision_score(Y_test_cl, Y_pred, labels=labels_str, average='macro')
+    print "Recall", recall_score(Y_test_cl, Y_pred, labels=labels_str, average='macro')
     print "F1", f1_score(Y_test_cl, Y_pred, labels=labels, average='macro')
 
     plt.figure("Confusion matrix")
-    plot_confusion_matrix(cm, set(Y_test))
+
+    plot_confusion_matrix(cm, labels_str)
     plt.savefig("confusion_matrix" + model_path.replace('.h5', ".pdf"))
     plt.figure("Normalized confusion matrix")
-    plot_confusion_matrix(cm, set(Y_test), normalize=True)
+    plot_confusion_matrix(cm, labels_str, normalize=True)
     plt.savefig("norm_confusion_matrix" + model_path.replace('.h5', ".pdf"))
     plt.show()
 
@@ -188,8 +190,8 @@ def plot_confusion_matrix(cm, classes,
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
 
-def run_model_on_proposed_regions(path_img, model, r_w=150, r_h=150, n=100,
-                                  opt='f'):
+def run_model_on_proposed_regions(path_img, path_model, r_w=150, r_h=150, n=100,
+                                  opt='q'):
     '''From an input image, find several sub images and predict objects in sub-
     images
     f=fast, q=quality
@@ -236,7 +238,7 @@ def run_model_on_proposed_regions(path_img, model, r_w=150, r_h=150, n=100,
             roi.append(im[y:y + h, x:x + w])
     # show output
     try:
-        model = load_model('../../code/CapstoneProject/model_tr1258_5_v326_5_steps_per_epoch_32_epochs_20_validation_steps_10.h5')
+        model = load_model(path_model)
         model.summary()
         model.get_config()
     except IOError:
@@ -244,18 +246,26 @@ def run_model_on_proposed_regions(path_img, model, r_w=150, r_h=150, n=100,
 
     x = []
     y = []
-    for n, v in enumerate(roi):
-        x.append(cv2.resize(v, (r_w, r_h)))
-        #cv2.imshow("f"+str(n), v)
-    X = np.array(x)
-    output = model.predict(X)
+    while True:
+        for n, v in enumerate(roi):
+            x.append(cv2.resize(v, (r_w, r_h)))
+            cv2.imshow("f"+str(n), v)
+        X = np.array(x)
+        output = model.predict(X)
+        output_class = model.predict_classes(X)
 
-    Y_pred = output.argmax(axis=-1)
+        Y_pred = output.argmax(axis=-1)
 
-    # prob_labels = (label, prob)
+        # prob_labels = (label, prob)
+        print "OUTPUT", output_class
+        cl = import_labels(path_model)
+        print [(i, cl[o]) for i, o in enumerate(output_class)]
+        # record key press
+        k = cv2.waitKey(0) & 0xFF
+        if k == 113:
+            break
 
-
-    return prob_labels
+    return output_class
 
 
 def main(model_path, test_paths, labels, n_cl, rw=150, rh=150):

@@ -1,5 +1,6 @@
 import numpy as np
 import sys
+import os
 import json
 #time
 import time
@@ -12,7 +13,8 @@ from keras.layers import Convolution2D, MaxPooling2D
 #utilities
 from keras.utils import np_utils
 from keras.utils import plot_model
-from keras.callbacks import History, TensorBoard, EarlyStopping
+from keras.callbacks import History, TensorBoard, EarlyStopping, \
+                            CSVLogger, ModelCheckpoint
 from keras import optimizers
 # keras with ImageDataGeneration
 from keras.preprocessing import image
@@ -36,9 +38,17 @@ def train_model(train_path, val_path, model_f_name, isbinary=False):
                 histogram_freq=0, batch_size=32, write_graph=True,
                 write_grads=False, write_images=False, embeddings_freq=0,
                 embeddings_layer_names=None, embeddings_metadata=None)
-    stop_when_ok = EarlyStopping(monitor='val_loss', min_delta=0.05, patience=3,
+    stop_when_ok = EarlyStopping(monitor='val_loss', min_delta=0.05, patience=5,
                                  verbose=1, mode='auto')
-    callbacks_list = [stop_when_ok, board]
+    try:
+        os.stat(model_f_name)
+    except:
+        os.mkdir(model_f_name)
+    models_trained = ModelCheckpoint(os.path.join(model_f_name, "weights.{epoch:02d}-{val_loss:.2f}.hdf5"), monitor='val_loss', verbose=0,
+         save_best_only=True, save_weights_only=False, mode='auto', period=1)
+    performance_training = CSVLogger(os.path.join(model_f_name, 'logger.csv'), separator=',', append=False)
+    #callbacks_list = [stop_when_ok, board]
+    callbacks_list = [board, models_trained, performance_training]
     # read images for training sample
     # data augmentation applied
     im_w = 128  # 150
@@ -47,7 +57,7 @@ def train_model(train_path, val_path, model_f_name, isbinary=False):
     train_datagen = image.ImageDataGenerator(
         featurewise_center=True,
         featurewise_std_normalization=True,
-        rescale=1. / 255,
+        rescale=1. / 255.,
         shear_range=0.2,
         zoom_range=0.2,
         horizontal_flip=True)
@@ -55,7 +65,7 @@ def train_model(train_path, val_path, model_f_name, isbinary=False):
     test_datagen = image.ImageDataGenerator(
         featurewise_center=True,
         featurewise_std_normalization=True,
-        rescale=1. / 255)
+        rescale=1. / 255.)
 
     train_generator = train_datagen.flow_from_directory(
             train_path,
@@ -63,6 +73,7 @@ def train_model(train_path, val_path, model_f_name, isbinary=False):
             batch_size=32,
             class_mode='categorical')
 
+    print "Classes", train_generator.class_indices
     json.dump(train_generator.class_indices, open(model_f_name + '.json', 'w'))
 
     # read images for validation sample
@@ -107,7 +118,7 @@ def train_model(train_path, val_path, model_f_name, isbinary=False):
         output = model.fit_generator(
             train_generator,
             steps_per_epoch=32,
-            epochs=100,
+            epochs=40,
             validation_data=validation_generator,
             validation_steps=10,
             callbacks=callbacks_list)
